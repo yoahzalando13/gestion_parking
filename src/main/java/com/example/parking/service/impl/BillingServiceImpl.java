@@ -26,7 +26,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -74,7 +73,8 @@ public class BillingServiceImpl implements BillingService {
                 session.getVehicle().getType(),
                 session.getUser().getCategory());
 
-        boolean subscriberValid = subscription != null && subscription.isValidOn(LocalDate.now());
+        boolean subscriberValid = subscription != null
+                && subscription.isValidOn(session.getExitTime().toLocalDate());
 
         PricingResult result = pricingCalculator.compute(
                 actualMinutes,

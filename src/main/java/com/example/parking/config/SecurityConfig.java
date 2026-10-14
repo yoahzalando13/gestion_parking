@@ -78,9 +78,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/statistics/**", "/api/parking/revenue")
                         .hasAnyRole(ADMIN, MANAGER)
                         .requestMatchers(HttpMethod.DELETE, "/api/vehicles/**").hasAnyRole(ADMIN, MANAGER)
-                        .requestMatchers(HttpMethod.POST, "/api/vehicles/**").hasAnyRole(ADMIN, MANAGER, OPERATOR)
-                        .requestMatchers(HttpMethod.PUT, "/api/vehicles/**").hasAnyRole(ADMIN, MANAGER, OPERATOR)
-                        // Reservations : tous les roles authentifies
+                        .requestMatchers("/api/vehicles/**").hasAnyRole(ADMIN, MANAGER, OPERATOR)
+                        // Reservations : tous les roles authentifies (un USER ne voit que les siennes,
+                        // controle dans ReservationRestController) ; l'expiration est une tache de gestion
+                        .requestMatchers(HttpMethod.POST, "/api/reservations/expire-stale")
+                        .hasAnyRole(ADMIN, MANAGER, OPERATOR)
                         .requestMatchers("/api/reservations/**").hasAnyRole(ADMIN, MANAGER, OPERATOR, USER)
                         // Consultation
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()

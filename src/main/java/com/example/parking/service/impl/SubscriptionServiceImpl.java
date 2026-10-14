@@ -111,12 +111,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 : catalogPrice(request.getType()));
 
         Subscription saved = subscriptionRepository.save(subscription);
-
-        // Un abonne beneficie de la priorite sur les places de type ABONNE
-        if (user.getCategory() == UserCategory.STANDARD) {
-            user.setCategory(UserCategory.ABONNE);
-            userRepository.save(user);
-        }
+        promoteToSubscriber(user);
 
         log.info("Abonnement {} cree pour {} ({} -> {})", saved.getReference(), vehicle.getPlateNumber(),
                 startDate, endDate);
@@ -131,7 +126,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             throw new InvalidOperationException("Cet abonnement est deja annule");
         }
         subscription.setStatus(SubscriptionStatus.ANNULE);
-        return subscriptionMapper.toResponse(subscriptionRepository.save(subscription));
+        Subscription saved = subscriptionRepository.save(subscription);
+        demoteIfNoLongerSubscriber(saved.getUser());
+        return subscriptionMapper.toResponse(saved);
     }
 
     @Override
@@ -142,7 +139,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             throw new InvalidOperationException("Seul un abonnement actif peut etre suspendu");
         }
         subscription.setStatus(SubscriptionStatus.SUSPENDU);
-        return subscriptionMapper.toResponse(subscriptionRepository.save(subscription));
+        Subscription saved = subscriptionRepository.save(subscription);
+        demoteIfNoLongerSubscriber(saved.getUser());
+        return subscriptionMapper.toResponse(saved);
     }
 
     @Override
@@ -157,7 +156,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                     + subscription.getEndDate() + " : creez un nouvel abonnement");
         }
         subscription.setStatus(SubscriptionStatus.ACTIF);
-        return subscriptionMapper.toResponse(subscriptionRepository.save(subscription));
+        Subscription saved = subscriptionRepository.save(subscription);
+        promoteToSubscriber(saved.getUser());
+        return subscriptionMapper.toResponse(saved);
     }
 
     @Override
@@ -186,10 +187,36 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             subscription.setStatus(SubscriptionStatus.EXPIRE);
             subscriptionRepository.save(subscription);
         }
+        expired.stream().map(Subscription::getUser).distinct().forEach(this::demoteIfNoLongerSubscriber);
         if (!expired.isEmpty()) {
             log.info("{} abonnement(s) passe(s) en EXPIRE", expired.size());
         }
         return expired.size();
+    }
+
+    /** Un abonne beneficie de la priorite sur les places de type ABONNE. */
+    private void promoteToSubscriber(User user) {
+        if (user.getCategory() == UserCategory.STANDARD) {
+            user.setCategory(UserCategory.ABONNE);
+            userRepository.save(user);
+        }
+    }
+
+    /**
+     * Retire la categorie ABONNE des qu'il ne reste plus aucun abonnement actif :
+     * sans cela l'utilisateur conserverait indefiniment la reduction et la
+     * priorite abonne apres une annulation, une suspension ou une echeance.
+     */
+    private void demoteIfNoLongerSubscriber(User user) {
+        if (user.getCategory() != UserCategory.ABONNE) {
+            return;
+        }
+        boolean stillSubscriber = subscriptionRepository.existsByUserIdAndStatusAndEndDateGreaterThanEqual(
+                user.getId(), SubscriptionStatus.ACTIF, LocalDate.now());
+        if (!stillSubscriber) {
+            user.setCategory(UserCategory.STANDARD);
+            userRepository.save(user);
+        }
     }
 
     private Subscription getEntity(Long id) {

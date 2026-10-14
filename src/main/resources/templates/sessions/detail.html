@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Detail session')}"></head>
 <body>
 <div class="app">
@@ -47,7 +48,7 @@
                 <div><span>Montant total</span>
                     <strong th:text="${parkingSession.invoice().totalAmount()} + ' ' + ${currency}"></strong></div>
             </div>
-            <div class="form-actions">
+            <div class="form-actions" sec:authorize="hasAnyRole('ADMIN','MANAGER')">
                 <a class="btn primary" th:href="@{'/invoices/' + ${parkingSession.invoice().id()}}">Voir la facture</a>
             </div>
         </div>

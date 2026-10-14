@@ -193,7 +193,11 @@ public class ParkingSpaceServiceImpl implements ParkingSpaceService {
             space.setStatus(SpaceStatus.HORS_SERVICE);
             space.setOutOfServiceReason(StringUtils.hasText(reason) ? reason.trim() : "Maintenance");
         } else {
-            space.setStatus(SpaceStatus.LIBRE);
+            // Une place remise en service reste RESERVEE si des reservations actives
+            // la ciblent : sinon l'attribution automatique la donnerait a un autre vehicule.
+            long activeReservations = reservationRepository.countBySpaceIdAndStatusIn(space.getId(),
+                    ReservationStatus.activeStatuses());
+            space.setStatus(activeReservations > 0 ? SpaceStatus.RESERVEE : SpaceStatus.LIBRE);
             space.setOutOfServiceReason(null);
         }
     }

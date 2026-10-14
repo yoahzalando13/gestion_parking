@@ -288,18 +288,26 @@ La zone préférée est essayée en premier, puis la recherche s'étend à tout 
 - Deux réservations actives ne peuvent pas se chevaucher sur la même place (409).
 - Un même véhicule ne peut pas avoir deux réservations sur la même période (409).
 - Seule une réservation `CONFIRMEE` peut être modifiée ou annulée (422 sinon).
+- Un compte `USER` ne voit, ne modifie et n'annule que ses propres réservations (403 sinon).
+- Les réservations non honorées passent automatiquement en `EXPIREE` et libèrent leur place
+  (tâche planifiée toutes les 5 min, réglable via `parking.maintenance.*`).
 
 ### Abonnements
 
 Types `JOURNALIER`, `HEBDOMADAIRE`, `MENSUEL`, `ANNUEL` — la date de fin est calculée
 automatiquement. La validité est déduite du statut et de la période.
 Un véhicule ne peut pas cumuler deux abonnements actifs sur la même période.
+Un client `STANDARD` passe en catégorie `ABONNE` à la création d'un abonnement et la perd dès
+qu'il ne lui reste plus d'abonnement actif (annulation, suspension, échéance). Les abonnements
+échus passent automatiquement en `EXPIRE` (même tâche planifiée que les réservations).
 
 ### Entrées / sorties
 
 - Un véhicule déjà dans le parking ne peut pas entrer une deuxième fois (409).
 - Le système honore automatiquement la réservation du véhicule (tolérance configurable).
 - Sans réservation, une place compatible est attribuée automatiquement.
+- Si l'opérateur impose une autre place que celle réservée, la réservation suit le véhicule et
+  l'ancienne place est libérée.
 - La sortie clôture la session, libère la place et émet la facture.
 - L'historique complet des sessions est conservé.
 
@@ -380,3 +388,10 @@ mvn test
 16 tests unitaires couvrent le calcul tarifaire (franchise, arrondi, tarif minimum, forfait
 journalier, coefficients, majoration VIP, réduction abonné, dépassement), le calcul des dates
 d'abonnement et la détection de chevauchement des réservations.
+
+9 tests d'intégration (`ParkingRegressionIntegrationTest`, MockMvc + H2 en mode MySQL, profil
+`test`) vérifient les parcours complets API et Thymeleaf : droits par rôle, entrées / sorties,
+abonnements, remise en service des places et gestion des paramètres invalides. Aucun MySQL
+n'est nécessaire pour lancer `mvn test`.
+
+La CI GitHub Actions (`.github/workflows/ci.yml`) exécute `mvn verify` sur chaque push et pull request.

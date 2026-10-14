@@ -4,8 +4,8 @@ spring:
 
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:parking_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
-    username: root
-    password: Bugatti120305
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 10
@@ -89,3 +89,8 @@ parking:
     weekly-price: 80000.00
     monthly-price: 250000.00
     yearly-price: 2400000.00
+  maintenance:
+    # Expiration automatique des reservations non honorees et des abonnements echus
+    enabled: true
+    initial-delay-ms: 60000
+    fixed-delay-ms: 300000

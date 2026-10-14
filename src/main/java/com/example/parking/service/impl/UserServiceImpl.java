@@ -100,6 +100,12 @@ public class UserServiceImpl implements UserService {
         if (userRepository.existsByEmailAndIdNot(email, id)) {
             throw new ConflictException("L'email " + email + " est deja utilise");
         }
+        boolean losesAdminRights = user.getRole() == Role.ADMIN && user.isEnabled()
+                && (request.getRole() != Role.ADMIN || !request.isEnabled());
+        if (losesAdminRights && !hasOtherEnabledAdmin(id)) {
+            throw new BusinessException(
+                    "Modification impossible : il doit rester au moins un administrateur actif");
+        }
         userMapper.updateEntity(user, request);
         if (StringUtils.hasText(request.getNewPassword())) {
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -115,9 +121,14 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(
                     "Suppression impossible : cet utilisateur possede des reservations. Desactivez le compte.");
         }
-        if (user.getRole() == Role.ADMIN && userRepository.findByRole(Role.ADMIN).size() <= 1) {
+        if (user.getRole() == Role.ADMIN && !hasOtherEnabledAdmin(id)) {
             throw new BusinessException("Suppression impossible : il doit rester au moins un administrateur");
         }
         userRepository.delete(user);
+    }
+
+    private boolean hasOtherEnabledAdmin(Long excludedId) {
+        return userRepository.findByRole(Role.ADMIN).stream()
+                .anyMatch(admin -> admin.isEnabled() && !admin.getId().equals(excludedId));
     }
 }

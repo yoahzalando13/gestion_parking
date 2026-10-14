@@ -50,6 +50,10 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
                               @Param("status") SubscriptionStatus status,
                               @Param("excludedId") Long excludedId);
 
+    /** Vrai si l'utilisateur possede encore un abonnement actif non echu. */
+    boolean existsByUserIdAndStatusAndEndDateGreaterThanEqual(Long userId, SubscriptionStatus status,
+                                                              LocalDate date);
+
     /** Abonnements actifs dont la date de fin est depassee. */
     @Query("select s from Subscription s where s.status = :status and s.endDate < :date")
     List<Subscription> findExpired(@Param("status") SubscriptionStatus status, @Param("date") LocalDate date);

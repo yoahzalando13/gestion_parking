@@ -3,6 +3,7 @@ package com.example.parking.controller.web;
 import com.example.parking.dto.request.CreateReservationRequest;
 import com.example.parking.dto.request.UpdateReservationRequest;
 import com.example.parking.dto.response.ReservationResponse;
+import com.example.parking.entity.Reservation;
 import com.example.parking.entity.enums.ReservationStatus;
 import com.example.parking.mapper.ReservationMapper;
 import com.example.parking.security.CurrentUserProvider;
@@ -30,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Controller
@@ -82,7 +84,9 @@ public class ReservationWebController {
         model.addAttribute("search", search);
         model.addAttribute("status", status);
         model.addAttribute("userId", userId);
-        model.addAttribute("users", userService.findAll());
+        model.addAttribute("users", currentUserProvider.restrictedUserId() != null
+                ? List.of()
+                : userService.findAll());
         model.addAttribute("filterQuery", WebQueryUtils.buildFilterQuery(filters));
         model.addAttribute("activeMenu", "reservations");
         return "reservations/list";
@@ -90,7 +94,9 @@ public class ReservationWebController {
 
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, Model model) {
-        model.addAttribute("reservation", reservationService.getById(id));
+        ReservationResponse reservation = reservationService.getById(id);
+        currentUserProvider.checkOwnership(reservation.userId());
+        model.addAttribute("reservation", reservation);
         model.addAttribute("activeMenu", "reservations");
         return "reservations/detail";
     }
@@ -100,7 +106,7 @@ public class ReservationWebController {
         CreateReservationRequest form = new CreateReservationRequest();
         form.setExpectedArrival(LocalDateTime.now().plusHours(1).withSecond(0).withNano(0));
         form.setExpectedDeparture(LocalDateTime.now().plusHours(3).withSecond(0).withNano(0));
-        Long selfId = currentUserProvider.hasRole("USER") ? currentUserProvider.userId() : null;
+        Long selfId = currentUserProvider.restrictedUserId();
         if (selfId != null) {
             form.setUserId(selfId);
         }
@@ -114,7 +120,7 @@ public class ReservationWebController {
                          BindingResult bindingResult,
                          Model model,
                          RedirectAttributes redirectAttributes) {
-        Long selfId = currentUserProvider.hasRole("USER") ? currentUserProvider.userId() : null;
+        Long selfId = currentUserProvider.restrictedUserId();
         if (selfId != null) {
             form.setUserId(selfId);
         }
@@ -130,7 +136,9 @@ public class ReservationWebController {
 
     @GetMapping("/{id}/edit")
     public String editForm(@PathVariable Long id, Model model) {
-        UpdateReservationRequest form = reservationMapper.toUpdateRequest(reservationService.getEntity(id));
+        Reservation reservation = reservationService.getEntity(id);
+        currentUserProvider.checkOwnership(reservation.getUser().getId());
+        UpdateReservationRequest form = reservationMapper.toUpdateRequest(reservation);
         model.addAttribute("form", form);
         model.addAttribute("reservationId", id);
         model.addAttribute("availableSpaces", spaceService.findAvailable(null, null));
@@ -144,6 +152,7 @@ public class ReservationWebController {
                          BindingResult bindingResult,
                          Model model,
                          RedirectAttributes redirectAttributes) {
+        currentUserProvider.checkOwnership(reservationService.getById(id).userId());
         if (bindingResult.hasErrors()) {
             model.addAttribute("reservationId", id);
             model.addAttribute("availableSpaces", spaceService.findAvailable(null, null));
@@ -160,6 +169,7 @@ public class ReservationWebController {
     public String cancel(@PathVariable Long id,
                          @RequestParam(required = false) String reason,
                          RedirectAttributes redirectAttributes) {
+        currentUserProvider.checkOwnership(reservationService.getById(id).userId());
         ReservationResponse cancelled = reservationService.cancel(id, reason);
         redirectAttributes.addFlashAttribute("successMessage",
                 "Reservation " + cancelled.reference() + " annulee");
@@ -167,7 +177,9 @@ public class ReservationWebController {
     }
 
     private void populateFormData(Model model, Long selfId) {
-        model.addAttribute("users", userService.findAll());
+        model.addAttribute("users", selfId != null
+                ? List.of(userService.getById(selfId))
+                : userService.findAll());
         model.addAttribute("vehicles", selfId != null
                 ? vehicleService.findByOwner(selfId)
                 : vehicleService.findAll());
@@ -178,9 +190,7 @@ public class ReservationWebController {
 
     /** Un compte USER ne consulte que ses propres reservations. */
     private Long restrictToSelf(Long requestedUserId) {
-        if (currentUserProvider.hasRole("USER")) {
-            return currentUserProvider.userId();
-        }
-        return requestedUserId;
+        Long selfId = currentUserProvider.restrictedUserId();
+        return selfId != null ? selfId : requestedUserId;
     }
 }

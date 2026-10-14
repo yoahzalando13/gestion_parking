@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:replace="~{fragments/layout :: head('Entrees et sorties')}"></head>
 <body>
 <div class="app">
@@ -87,6 +88,7 @@
                             <a class="btn small primary" th:if="${ps.status().name() == 'EN_COURS'}"
                                th:href="@{/sessions/exit(plateNumber=${ps.plateNumber()})}">Sortie</a>
                             <a class="btn small" th:if="${ps.invoice()} != null"
+                               sec:authorize="hasAnyRole('ADMIN','MANAGER')"
                                th:href="@{'/invoices/' + ${ps.invoice().id()}}">Facture</a>
                         </td>
                     </tr>

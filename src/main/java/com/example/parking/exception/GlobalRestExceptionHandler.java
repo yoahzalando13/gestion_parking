@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -80,7 +81,7 @@ public class GlobalRestExceptionHandler {
     }
 
     @ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class,
-            HttpMessageNotReadableException.class})
+            HttpMessageNotReadableException.class, PropertyReferenceException.class})
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception ex, HttpServletRequest request) {
         return build(HttpStatus.BAD_REQUEST, "Requete mal formee : " + ex.getMessage(), request);
     }

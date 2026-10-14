@@ -132,9 +132,15 @@ public class SessionWebController {
         String amount = session.invoice() != null ? session.invoice().totalAmount().toPlainString() : "0";
         redirectAttributes.addFlashAttribute("successMessage",
                 "Sortie enregistree : " + session.plateNumber() + " - montant a payer " + amount);
-        if (session.invoice() != null) {
+        // La facturation est reservee a ADMIN / MANAGER : un operateur est renvoye
+        // vers le detail de la session, qui affiche deja le montant de la facture.
+        if (session.invoice() != null && canViewInvoices()) {
             return "redirect:/invoices/" + session.invoice().id();
         }
-        return "redirect:/sessions";
+        return "redirect:/sessions/" + session.id();
+    }
+
+    private boolean canViewInvoices() {
+        return currentUserProvider.hasRole("ADMIN") || currentUserProvider.hasRole("MANAGER");
     }
 }

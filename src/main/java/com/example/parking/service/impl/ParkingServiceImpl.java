@@ -37,7 +37,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -116,8 +115,18 @@ public class ParkingServiceImpl implements ParkingService {
         spaceRepository.save(space);
 
         if (reservation != null) {
+            ParkingSpace reservedSpace = reservation.getSpace();
+            boolean spaceChanged = !reservedSpace.getId().equals(space.getId());
             reservation.setStatus(ReservationStatus.EN_COURS);
+            if (spaceChanged) {
+                // L'operateur a impose une autre place : la reservation suit le vehicule,
+                // sinon la place initialement reservee resterait RESERVEE indefiniment.
+                reservation.setSpace(space);
+            }
             reservationRepository.save(reservation);
+            if (spaceChanged && reservedSpace.getStatus() == SpaceStatus.RESERVEE) {
+                releaseSpace(reservedSpace);
+            }
         }
 
         Subscription subscription = subscriptionService
@@ -179,7 +188,7 @@ public class ParkingServiceImpl implements ParkingService {
 
         Subscription subscription = closed.getSubscription() != null
                 ? closed.getSubscription()
-                : subscriptionService.findValidSubscription(vehicle.getId(), LocalDate.now()).orElse(null);
+                : subscriptionService.findValidSubscription(vehicle.getId(), exitTime.toLocalDate()).orElse(null);
 
         Invoice invoice = billingService.issueInvoice(closed, subscription, request.isMarkAsPaid());
 

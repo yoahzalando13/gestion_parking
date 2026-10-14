@@ -5,6 +5,7 @@ import com.example.parking.dto.request.UpdateReservationRequest;
 import com.example.parking.dto.response.PageResponse;
 import com.example.parking.dto.response.ReservationResponse;
 import com.example.parking.entity.enums.ReservationStatus;
+import com.example.parking.security.CurrentUserProvider;
 import com.example.parking.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,9 +35,12 @@ import java.time.LocalDateTime;
 public class ReservationRestController {
 
     private final ReservationService reservationService;
+    private final CurrentUserProvider currentUserProvider;
 
-    public ReservationRestController(ReservationService reservationService) {
+    public ReservationRestController(ReservationService reservationService,
+                                     CurrentUserProvider currentUserProvider) {
         this.reservationService = reservationService;
+        this.currentUserProvider = currentUserProvider;
     }
 
     @GetMapping
@@ -51,19 +55,29 @@ public class ReservationRestController {
             @DateTimeFormat(pattern = "yyyy-MM-dd'T'HH:mm") LocalDateTime to,
             @PageableDefault(size = 20, sort = "expectedArrival", direction = Sort.Direction.DESC)
             Pageable pageable) {
-        Page<ReservationResponse> page = reservationService.search(search, status, userId, from, to, pageable);
+        // Un compte USER ne consulte que ses propres reservations
+        Long selfId = currentUserProvider.restrictedUserId();
+        Long effectiveUserId = selfId != null ? selfId : userId;
+        Page<ReservationResponse> page = reservationService.search(search, status, effectiveUserId, from, to,
+                pageable);
         return ResponseEntity.ok(PageResponse.of(page));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Detail d'une reservation")
     public ResponseEntity<ReservationResponse> getOne(@PathVariable Long id) {
-        return ResponseEntity.ok(reservationService.getById(id));
+        ReservationResponse reservation = reservationService.getById(id);
+        currentUserProvider.checkOwnership(reservation.userId());
+        return ResponseEntity.ok(reservation);
     }
 
     @PostMapping
     @Operation(summary = "Cree une reservation (attribution automatique si aucune place fournie)")
     public ResponseEntity<ReservationResponse> create(@Valid @RequestBody CreateReservationRequest request) {
+        Long selfId = currentUserProvider.restrictedUserId();
+        if (selfId != null) {
+            request.setUserId(selfId);
+        }
         ReservationResponse created = reservationService.create(request);
         return ResponseEntity.created(URI.create("/api/reservations/" + created.id())).body(created);
     }
@@ -72,6 +86,7 @@ public class ReservationRestController {
     @Operation(summary = "Modifie une reservation confirmee")
     public ResponseEntity<ReservationResponse> update(@PathVariable Long id,
                                                       @Valid @RequestBody UpdateReservationRequest request) {
+        currentUserProvider.checkOwnership(reservationService.getById(id).userId());
         return ResponseEntity.ok(reservationService.update(id, request));
     }
 
@@ -79,6 +94,7 @@ public class ReservationRestController {
     @Operation(summary = "Annule une reservation")
     public ResponseEntity<ReservationResponse> cancel(@PathVariable Long id,
                                                       @RequestParam(required = false) String reason) {
+        currentUserProvider.checkOwnership(reservationService.getById(id).userId());
         return ResponseEntity.ok(reservationService.cancel(id, reason));
     }
 
